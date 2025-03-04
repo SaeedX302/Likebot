@@ -94,9 +94,9 @@ async def send_multiple_requests(uid, server_name, url):
         app.logger.error(f"Error in send_multiple_requests: {e}")
         return None
 
-# Encode UID
-def enc(uid):
-    protobuf_data = create_protobuf(uid)
+# Encode UID (Fixed Function)
+def enc(uid, region):
+    protobuf_data = create_protobuf_message(uid, region)
     return encrypt_message(protobuf_data) if protobuf_data else None
 
 # Request player info
@@ -151,7 +151,7 @@ def handle_requests():
             if not tokens:
                 raise Exception("Failed to load tokens.")
             token = tokens[0]['token']
-            encrypted_uid = enc(uid)
+            encrypted_uid = enc(uid, server_name)  # Fixed Call
             if not encrypted_uid:
                 raise Exception("Encryption of UID failed.")
 
