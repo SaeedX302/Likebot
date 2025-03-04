@@ -15,12 +15,12 @@ from google.protobuf.message import DecodeError
 
 app = Flask(__name__)
 
-# ✅ Load tokens from environment variables (Vercel-friendly)
+# ✅ Load tokens from Vercel Environment Variables
 def load_tokens(server_name):
     try:
-        token_data = os.getenv(f"TOKEN_{server_name}")
+        token_data = os.getenv(f"TOKEN_{server_name}")  # Fetch from Vercel ENV
         if token_data:
-            return json.loads(token_data)
+            return json.loads(token_data)  # Convert JSON string to dict
         else:
             raise Exception(f"Missing token for {server_name}")
     except Exception as e:
@@ -98,13 +98,7 @@ def enc(uid, region):
 # ✅ Fetch player info
 def make_request(encrypt, server_name, token):
     try:
-        url = (
-            "https://client.ind.freefiremobile.com/GetPlayerPersonalShow"
-            if server_name == "IND"
-            else "https://client.us.freefiremobile.com/GetPlayerPersonalShow"
-            if server_name in {"BR", "US", "SAC", "NA"}
-            else "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
-        )
+        url = f"https://client.{server_name.lower()}.freefiremobile.com/GetPlayerPersonalShow"
         edata = bytes.fromhex(encrypt)
         headers = {
             'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 9; Build/PI)",
@@ -116,7 +110,7 @@ def make_request(encrypt, server_name, token):
             'ReleaseVersion': "OB48"
         }
         response = requests.post(url, data=edata, headers=headers, verify=False)
-        
+
         # ✅ Debugging logs
         app.logger.info(f"Request URL: {url}")
         app.logger.info(f"Response Status: {response.status_code}")
@@ -164,29 +158,24 @@ async def handle_requests():
         data_before = json.loads(MessageToJson(before_data))
         before_like = int(data_before.get('AccountInfo', {}).get('Likes', 0))
 
-        # ✅ Choose LikeProfile URL
-        url = f"https://client.{server_name.lower()}.freefiremobile.com/LikeProfile"
-
         # ✅ Send likes asynchronously
+        url = f"https://client.{server_name.lower()}.freefiremobile.com/LikeProfile"
         await send_multiple_requests(uid, server_name, url)
 
         # ✅ Fetch player info after likes
         after_data = make_request(encrypted_uid, server_name, token)
-        if not after_data:
-            raise Exception("Failed to fetch player info after liking.")
         data_after = json.loads(MessageToJson(after_data))
         after_like = int(data_after.get('AccountInfo', {}).get('Likes', 0))
-        like_given = after_like - before_like
 
         return jsonify({
             "LikesBefore": before_like,
             "LikesAfter": after_like,
-            "LikesGiven": like_given,
+            "LikesGiven": after_like - before_like,
             "PlayerUID": uid,
-            "Status": "Success" if like_given else "Failed"
+            "Status": "Success"
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True)
